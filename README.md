@@ -3,7 +3,7 @@ Fast pixelflut server written in C. It is a collaborative coding game. Project t
 
 ## Hardware requirements
 
-It works on a Raspberry Pi but it is no fun. Every x86 dual-core with a little bit of graphics power (for 2D SDL) should work. On an Core i3-4010U you can easily utilize 1 GBit Nic on --connections_max 1000. On large events 10 GBit fiber and a few more CPU-Cores are even more fun.
+It works on a Raspberry Pi but it is no fun. Every x86 dual-core with a little bit of graphics power (for 2D SDL) should work. On an Core i3-4010U you can easily utilize 1 GBit Nic on --connections_max 1000. On large events 10 GBit fiber and a few more CPU-Cores are even more fun. 1 Thread per CPU-Core seems to be good.
 
 ## Features
 - Multithreaded

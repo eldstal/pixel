@@ -1,8 +1,13 @@
 #include "server.c"
 #include <SDL.h>
+#include<netdb.h>
+#include<ifaddrs.h>
+
 
 #define BEGINS_WITH(str, test) (!strncmp(str, test, sizeof(test)))
 #define OPTION(opt, desc) printf("\t" opt "\t" desc "\n")
+
+int get_ip_of_default_gateway_interface (char* ip);
 
 int main(int argc, char **argv)
 {
@@ -17,6 +22,7 @@ int main(int argc, char **argv)
 	int fade_out = 0;
 	int fade_interval = 4;
 	int show_text = 1;
+	int show_ip_instead_of_hostname = 0;
 	
 	for (int i = 1; i < argc; i++)
 	{
@@ -29,12 +35,13 @@ int main(int argc, char **argv)
 			OPTION("--port <port>", "\t\tTCP port. Default: 1234.");
 			OPTION("--connection_timeout <seconds>", "Connection timeout on idle. Default: 5s.");
 			OPTION("--connections_max <n>", "\tMaximum number of open connections. Default: 16.");
-			OPTION("--threads <n>", "\t\tNumber of connection handler threads. Default: 3.");
+			OPTION("--threads <n>", "\t\tNumber of connection handler threads. Default: 3. (good: CPU-Cores + 1)");
 			OPTION("--no-histogram", "\t\tDisable calculating and serving the histogram over HTTP.");
 			OPTION("--fullscreen", "\t\tStart in fullscreen mode.");
 			OPTION("--fade_out", "\t\tEnable fading out the framebuffer contents.");
 			OPTION("--fade_interval <frames>", "Interval for fading out the framebuffer as number of displayed frames. Default: 4.");
 			OPTION("--hide_text", "\t\tHide the overlay text.");
+			OPTION("--show_ip_instead_of_hostname", "\t\tShow IPv4 of interface with default-gateway on overlay.");
 			return 0;
 		}
 		else if (BEGINS_WITH(argv[i], "--width") && i + 1 < argc)
@@ -59,6 +66,8 @@ int main(int argc, char **argv)
 			fade_interval = strtol(argv[++i], 0, 10);
 		else if (BEGINS_WITH(argv[i], "--hide_text"))
 			show_text = 0;
+		else if (BEGINS_WITH(argv[i], "--show_ip_instead_of_hostname"))
+			show_ip_instead_of_hostname = 1;
 		else
 		{
 			printf("unknown option \"%s\"\n", argv[i]);
@@ -128,7 +137,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	
-	char hostname[256] = "127.0.0.1";
+	char hostname_or_ip[256] = "";
 	char text_additional[256];
 	int text_position[2] = { 32, height - 64 };
 	int text_size = 20;
@@ -137,14 +146,15 @@ int main(int argc, char **argv)
 
 	if (show_text)
 	{
-		gethostname(hostname, sizeof(hostname));
+		if (show_ip_instead_of_hostname) get_ip_of_default_gateway_interface(hostname_or_ip);
+		else gethostname(hostname_or_ip, sizeof(hostname_or_ip));
 		if (serve_histogram)
-			snprintf(text_additional, sizeof(text_additional), "http://%s:%d", hostname, port);
+			snprintf(text_additional, sizeof(text_additional), "http://%s:%d", hostname_or_ip, port);
 		else
-			snprintf(text_additional, sizeof(text_additional), "echo \"PX <X> <Y> <RRGGBB>\\n\" > nc %s %d", hostname, port);
+			snprintf(text_additional, sizeof(text_additional), "echo \"PX <X> <Y> <RRGGBB>\\n\" > nc %s %d", hostname_or_ip, port);
 	}
 
-	while("the cat is sleeping on the keyboard")
+	while("the cat is sleeping on the keyboard and maybe the otter is eating the cat")
 	{
 		server_update(server);
 
@@ -157,8 +167,8 @@ int main(int argc, char **argv)
 				text_bgcolor[0], text_bgcolor[1], text_bgcolor[2], text_bgcolor[3]);
 			
 			char text[1024];
-			sprintf(text, "connections: %4u; pixels: %10" PRId64 "; p/s: %8u",
-				server->connection_count, server->total_pixels_received, server->pixels_received_per_second);
+			sprintf(text, "connections: %4u; Megapixels: %10" PRId64 "; p/s: %8u",
+				server->connection_count, server->total_pixels_received/1000000, server->pixels_received_per_second);
 			framebuffer_write_text_with_background(
 				&server->framebuffer,
 				text_position[0], text_position[1] + text_size, text, text_size,
@@ -202,4 +212,70 @@ int main(int argc, char **argv)
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 	return 0;
+}
+
+int get_ip_of_default_gateway_interface (char* ip)
+{
+	// source: http://www.binarytides.com/get-local-ip-c-linux/
+    FILE *f;
+    char line[100] , *p , *c;
+     
+    f = fopen("/proc/net/route" , "r");
+     
+    while(fgets(line , 100 , f))
+    {
+        p = strtok(line , " \t");
+        c = strtok(NULL , " \t");
+         
+        if(p!=NULL && c!=NULL)
+        {
+            if(strcmp(c , "00000000") == 0)
+            {
+                // printf("Default interface is : %s \n" , p);
+                break;
+            }
+        }
+    }
+     
+    //which family do we require , AF_INET or AF_INET6
+    int fm = AF_INET;
+    struct ifaddrs *ifaddr, *ifa;
+    int family , s;
+    // char ip[NI_MAXHOST];
+ 
+    if (getifaddrs(&ifaddr) == -1) 
+    {
+        perror("getifaddrs");
+        exit(EXIT_FAILURE);
+    }
+ 
+    //Walk through linked list, maintaining head pointer so we can free list later
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) 
+    {
+        if (ifa->ifa_addr == NULL)
+        {
+            continue;
+        }
+ 
+        family = ifa->ifa_addr->sa_family;
+ 
+        if(strcmp( ifa->ifa_name , p) == 0)
+        {
+            if (family == fm) 
+            {
+                s = getnameinfo( ifa->ifa_addr, (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) , ip , NI_MAXHOST , NULL , 0 , NI_NUMERICHOST);
+                 
+                if (s != 0) 
+                {
+                    printf("Error: can not get IP-Address. (getnameinfo() failed: %s) (quick fix: do not use --show_ip_instead_of_ipname\n", gai_strerror(s));
+                    exit(EXIT_FAILURE);
+                }
+                // printf("address: %s", ip);
+				return 0; //erfolg
+            }
+            // printf("\n");
+        }
+    }
+    freeifaddrs(ifaddr);
+    return 0;
 }

@@ -15,8 +15,8 @@ int main(int argc, char **argv)
 	int height = 0;
 	uint16_t port = 1234;
 	int connection_timeout = 5;
-	int connections_max = 16;
-	int threads = 3;
+	int connections_max = 1000;
+	int threads = 2;
 	int serve_histogram = 1;
 	int start_fullscreen = 0;
 	int fade_out = 0;
@@ -34,8 +34,8 @@ int main(int argc, char **argv)
 			OPTION("--height <pixels>", "\tFramebuffer width. Default: Screen height.");
 			OPTION("--port <port>", "\t\tTCP port. Default: 1234.");
 			OPTION("--connection_timeout <seconds>", "Connection timeout on idle. Default: 5s.");
-			OPTION("--connections_max <n>", "\tMaximum number of open connections. Default: 16.");
-			OPTION("--threads <n>", "\t\tNumber of connection handler threads. Default: 3. (good: CPU-Cores + 1)");
+			OPTION("--connections_max <n>", "\tMaximum number of open connections. Default: 1000.");
+			OPTION("--threads <n>", "\t\tNumber of connection handler threads. Default: 2. (good: number of CPU-Cores)");
 			OPTION("--no-histogram", "\t\tDisable calculating and serving the histogram over HTTP.");
 			OPTION("--fullscreen", "\t\tStart in fullscreen mode.");
 			OPTION("--fade_out", "\t\tEnable fading out the framebuffer contents.");
